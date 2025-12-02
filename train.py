@@ -1,7 +1,11 @@
 import os
+# Set this before any other imports or tokenizer usage to suppress warnings and avoid deadlocks in forks (e.g. video recording)
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 import torch
 import numpy as np
 import logging
+import time
 from torch.utils.tensorboard import SummaryWriter
 from gymnasium.wrappers import RecordVideo
 
@@ -27,7 +31,9 @@ def train():
     SAVE_INTERVAL = 500
     
     # Setup paths
-    run_name = "breakout_ppo_qwen"
+    now = time.time()
+    timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(now))
+    run_name = f"{timestamp}_breakout_ppo_qwen"
     log_dir = f"runs/{run_name}"
     video_dir = f"videos/{run_name}"
     os.makedirs(log_dir, exist_ok=True)
