@@ -33,6 +33,7 @@ class PPOAgent:
             # Generate
             outputs = self.model.generate(
                 inputs.input_ids,
+                attention_mask=inputs.attention_mask,
                 max_new_tokens=max_new_tokens,
                 do_sample=True,
                 temperature=0.7,
@@ -94,9 +95,9 @@ class PPOAgent:
         # Flatten data
         states = [r['state'] for r in rollouts]
         actions = [r['action_text'] for r in rollouts]
-        old_log_probs = torch.tensor([r['log_prob'] for r in rollouts]).to(self.model.base_model.device)
-        returns = torch.tensor([r['return'] for r in rollouts]).to(self.model.base_model.device)
-        advantages = torch.tensor([r['advantage'] for r in rollouts]).to(self.model.base_model.device)
+        old_log_probs = torch.tensor([r['log_prob'] for r in rollouts], dtype=torch.float32).to(self.model.base_model.device)
+        returns = torch.tensor([r['return'] for r in rollouts], dtype=torch.float32).to(self.model.base_model.device)
+        advantages = torch.tensor([r['advantage'] for r in rollouts], dtype=torch.float32).to(self.model.base_model.device)
         
         # Normalize advantages
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
