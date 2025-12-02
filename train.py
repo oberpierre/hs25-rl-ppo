@@ -52,20 +52,35 @@ def train():
     # Model
     logger.info("Loading model...")
     model = ActorCritic()
+    device = "cpu"
     if torch.backends.mps.is_available():
-        model.to("mps")
+        device = "mps"
     elif torch.cuda.is_available():
-        model.to("cuda")
+        device = "cuda"
+    
+    logger.info(f"Using device: {device}")
+    model.to(device)
     
     agent = PPOAgent(model, model.tokenizer, lr=LR, gamma=GAMMA)
     
     # Training Loop
     obs, info = env.reset()
     total_steps = 0
+    current_episode_reward = 0
+    
+    from tqdm import tqdm
+    from collections import deque
+    
+    pbar = tqdm(total=MAX_STEPS, desc="Training Steps")
+    
+    # Stats for tqdm
+    recent_scores = deque(maxlen=10)
+    last_score = 0.0
+    avg_score = 0.0
+    last_loss = 0.0
     
     while total_steps < MAX_STEPS:
         rollouts = []
-        episode_rewards = []
         
         # Rollout Phase
         for _ in range(STEPS_PER_EPOCH):
@@ -82,10 +97,26 @@ def train():
                 "done": terminated or truncated
             })
             
+            current_episode_reward += reward
             obs = next_obs
             total_steps += 1
+            pbar.update(1)
+            
+            # Update progress bar description immediately
+            pbar.set_postfix_str(f"Avg: {avg_score:.2f} | Curr: {current_episode_reward:.2f} | Last: {last_score:.2f} | Loss: {last_loss:.4f}")
             
             if terminated or truncated:
+                # Log episode reward immediately
+                writer.add_scalar("Reward/episode_reward", current_episode_reward, total_steps)
+                writer.flush() # Ensure it's written to disk
+                
+                last_score = current_episode_reward
+                recent_scores.append(last_score)
+                avg_score = sum(recent_scores) / len(recent_scores)
+                
+                logger.info(f"Episode finished at step {total_steps}. Reward: {current_episode_reward:.2f}")
+                
+                current_episode_reward = 0
                 obs, info = env.reset()
                 
         # Compute Advantages and Returns
@@ -108,21 +139,24 @@ def train():
             
         # Update Phase
         loss = agent.update(rollouts, batch_size=BATCH_SIZE)
+        last_loss = loss.item() if isinstance(loss, torch.Tensor) else loss
         
         # Logging
-        avg_reward = np.mean(rewards)
-        writer.add_scalar("Loss/policy_value", loss, total_steps)
-        writer.add_scalar("Reward/average_step", avg_reward, total_steps)
+        avg_step_reward = np.mean(rewards)
+        writer.add_scalar("Loss/policy_value", last_loss, total_steps)
+        writer.add_scalar("Reward/average_step_reward", avg_step_reward, total_steps)
+        writer.flush()
         
-        logger.info(f"Step {total_steps}: Loss {loss:.4f}, Avg Reward {avg_reward:.4f}")
+        logger.info(f"Step {total_steps}: Loss {last_loss:.4f}, Avg Step Reward {avg_step_reward:.4f}")
         
         # Save Checkpoint
         # Check if we crossed a save interval or finished
         if total_steps // SAVE_INTERVAL > (total_steps - STEPS_PER_EPOCH) // SAVE_INTERVAL:
-            save_path = f"checkpoints/{run_name}_{total_steps}"
+            save_path = f"checkpoints/{run_name}/step_{total_steps}"
             model.save_pretrained(save_path)
             logger.info(f"Saved checkpoint to {save_path}")
 
+    pbar.close()
     env.close()
     writer.close()
 
