@@ -1,0 +1,11 @@
+torch
+gymnasium[atari,accept-rom-license]
+ale-py
+transformers
+peft
+accelerate
+numpy
+opencv-python
+moviepy
+tensorboard
+shimmy
