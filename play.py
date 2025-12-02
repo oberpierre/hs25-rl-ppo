@@ -53,6 +53,9 @@ def play(checkpoint_path=None, model_name="Qwen/Qwen3-0.6B"):
             generated_ids = outputs[:, inputs.input_ids.shape[1]:]
             action_text = model.tokenizer.decode(generated_ids[0], skip_special_tokens=True)
             
+            # Clean up action text for logging/env
+            action_text = action_text.strip().split('\n')[0]
+            
             logger.info(f"Observation: {obs}")
             logger.info(f"Action: {action_text}")
             

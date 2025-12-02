@@ -76,6 +76,27 @@ class BreakoutRewardShaper:
             self.last_potential = current_potential
             
         return shaped_reward
+
+    def calculate_format_reward(self, action_text: str) -> float:
+        """
+        Calculate reward based on output format.
+        Penalize invalid or verbose actions.
+        """
+        reward = 0.0
+        if isinstance(action_text, str):
+            cleaned_text = action_text.strip().upper()
+            # Check for keywords
+            if not any(k in cleaned_text for k in ["LEFT", "RIGHT", "FIRE", "NOOP"]):
+                reward -= 0.1
+            
+            # Penalize verbosity
+            if len(cleaned_text) > 10:
+                reward -= 0.05
+        else:
+            # Invalid type (should be str for LLM)
+            reward -= 0.1
+            
+        return reward
         
     def reset(self, info: dict):
         self.last_potential = self.get_potential(info)

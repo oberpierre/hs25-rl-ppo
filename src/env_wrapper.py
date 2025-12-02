@@ -59,9 +59,10 @@ class BreakoutTextWrapper(gym.Wrapper):
                 "Ball is not in play. "
                 f"Lives: {info['lives']}. "
                 "Goal: Keep the ball alive and break bricks. "
-                "Available actions: LEFT, RIGHT, FIRE. "
+                "Available actions: LEFT, RIGHT, FIRE, NOOP. "
                 "You must FIRE to start the game. "
-                "What is your next move?"
+                "Output only one word.\n"
+                "Action:"
             )
             return obs_text
 
@@ -89,8 +90,9 @@ class BreakoutTextWrapper(gym.Wrapper):
             f"Ball is {ball_vel_desc}. "
             f"Lives: {info['lives']}. "
             "Goal: Keep the ball alive and break bricks. "
-            "Available actions: LEFT, RIGHT, FIRE. "
-            "What is your next move?"
+            "Available actions: LEFT, RIGHT, FIRE, NOOP. "
+            "Output only one word.\n"
+            "Action:"
         )
         return obs_text
 
@@ -111,16 +113,20 @@ class BreakoutTextWrapper(gym.Wrapper):
     def step(self, action_text):
         # Parse action
         if isinstance(action_text, str):
-            action_text = action_text.strip().upper()
+            cleaned_text = action_text.strip().upper()
             # Simple heuristic matching
-            if "LEFT" in action_text:
+            if "LEFT" in cleaned_text:
                 action = 3
-            elif "RIGHT" in action_text:
+            elif "RIGHT" in cleaned_text:
                 action = 2
-            elif "FIRE" in action_text:
+            elif "FIRE" in cleaned_text:
                 action = 1
+            elif "NOOP" in cleaned_text:
+                action = 0
             else:
                 action = 0 # NOOP
+                logger.warning(f"Invalid action: {action_text}")
+                
         elif isinstance(action_text, int) and action_text in [0, 1, 2, 3]:
             action = action_text
         else:
@@ -134,7 +140,10 @@ class BreakoutTextWrapper(gym.Wrapper):
         self.ball_history.append((ram_info['ball_x'], ram_info['ball_y']))
         
         if self.reward_shaper:
+            # Shape game reward
             reward = self.reward_shaper.shape_reward(reward, ram_info, terminated or truncated)
+            # Add format reward
+            reward += self.reward_shaper.calculate_format_reward(action_text)
             
         text_obs = self._get_text_obs(ram_info)
         
