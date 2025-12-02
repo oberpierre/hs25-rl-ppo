@@ -84,7 +84,7 @@ def train():
                 
         # Compute Advantages and Returns
         # We need next value for the last step
-        _, next_value = agent.get_action_and_value(obs) # Just to get value
+        _, _, next_value = agent.get_action_and_value(obs) # Just to get value
         # Actually get_action_and_value returns (action, log_prob, value)
         # We discard action/log_prob
         next_value = next_value
