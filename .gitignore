@@ -217,5 +217,6 @@ __marimo__/
 
 
 # Project specific ignores
+checkpoints/
 runs/
 videos/

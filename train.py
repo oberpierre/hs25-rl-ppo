@@ -117,7 +117,8 @@ def train():
         logger.info(f"Step {total_steps}: Loss {loss:.4f}, Avg Reward {avg_reward:.4f}")
         
         # Save Checkpoint
-        if total_steps % SAVE_INTERVAL == 0:
+        # Check if we crossed a save interval or finished
+        if total_steps // SAVE_INTERVAL > (total_steps - STEPS_PER_EPOCH) // SAVE_INTERVAL:
             save_path = f"checkpoints/{run_name}_{total_steps}"
             model.save_pretrained(save_path)
             logger.info(f"Saved checkpoint to {save_path}")
