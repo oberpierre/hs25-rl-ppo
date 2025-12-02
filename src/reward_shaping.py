@@ -38,6 +38,10 @@ class BreakoutRewardShaper:
         # Screen width is 160, but RAM values might differ. 
         # Usually paddle x is 0-200ish.
         
+        # If ball is not in play (0,0), give negative potential to encourage starting
+        if ball_y == 0:
+            return -1.0
+        
         dist = abs(int(paddle_x) - int(ball_x))
         max_dist = 160.0 # Approx screen width
         

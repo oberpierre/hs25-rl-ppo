@@ -52,6 +52,19 @@ class BreakoutTextWrapper(gym.Wrapper):
         }
 
     def _get_text_obs(self, info):
+        # Check if ball is in play.
+        if info['ball_y'] == 0:
+            obs_text = (
+                f"Paddle X: {info['paddle_x']}. "
+                "Ball is not in play. "
+                f"Lives: {info['lives']}. "
+                "Goal: Keep the ball alive and break bricks. "
+                "Available actions: LEFT, RIGHT, FIRE. "
+                "You must FIRE to start the game. "
+                "What is your next move?"
+            )
+            return obs_text
+
         # Calculate approximate velocity if possible
         ball_vel_desc = "stationary"
         if len(self.ball_history) == 2:
