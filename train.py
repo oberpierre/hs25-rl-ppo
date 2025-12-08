@@ -23,12 +23,12 @@ logger = logging.getLogger(__name__)
 
 def train():
     # Hyperparameters
-    MAX_STEPS = 1000 # Small for testing, increase for real training
     STEPS_PER_EPOCH = 128
     BATCH_SIZE = 4
     LR = 1e-5
     GAMMA = 0.99
-    SAVE_INTERVAL = 500
+    SAVE_INTERVAL = STEPS_PER_EPOCH * 4
+    MAX_STEPS = STEPS_PER_EPOCH * 100
     
     # Setup paths
     now = time.time()
@@ -116,7 +116,7 @@ def train():
             pbar.update(1)
             
             # Update progress bar description immediately
-            pbar.set_postfix_str(f"Avg: {avg_score:.2f} | Curr: {current_episode_reward:.2f} | Last: {last_score:.2f} | Loss: {last_loss:.4f}")
+            pbar.set_postfix_str(f"Avg: {avg_score:.2f} | Curr: {current_episode_reward:.2f} | Last: {last_score:.2f} | Loss: {last_loss:.4f}\n")
             
             if terminated or truncated:
                 # Log episode reward immediately
