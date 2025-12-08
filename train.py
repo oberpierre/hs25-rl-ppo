@@ -21,22 +21,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def train():
+def train(
+    lr=1e-5,
+    target_kl=0.1,
+    steps_per_epoch=128,
+    max_steps=128 * 20, # Default to ~20 epochs
+):
     # Hyperparameters
-    STEPS_PER_EPOCH = 128
+    STEPS_PER_EPOCH = steps_per_epoch
     BATCH_SIZE = 4
-    LR = 1e-4 # 1e-4, 1e-4
+    LR = lr
     GAMMA = 0.99
-    GAMMA = 0.99
-    TARGET_KL = 0.1 # 1, 0.1
+    TARGET_KL = target_kl
     INIT_KL_COEF = 0.05
     SAVE_INTERVAL = STEPS_PER_EPOCH * 4
-    MAX_STEPS = STEPS_PER_EPOCH * 20
+    MAX_STEPS = max_steps
     
     # Setup paths
     now = time.time()
     timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(now))
-    run_name = f"{timestamp}_breakout_ppo_qwen"
+    run_name = f"{timestamp}_lr{LR}_kl{TARGET_KL}"
     log_dir = f"runs/{run_name}"
     video_dir = f"videos/{run_name}"
     os.makedirs(log_dir, exist_ok=True)
