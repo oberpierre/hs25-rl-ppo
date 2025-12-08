@@ -5,6 +5,10 @@ import logging
 from src.env_wrapper import BreakoutTextWrapper
 from src.model import ActorCritic
 
+import os
+# Mute SDL audio for Atari
+os.environ["SDL_AUDIODRIVER"] = "dummy"
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
