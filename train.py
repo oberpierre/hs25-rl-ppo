@@ -61,6 +61,19 @@ def train():
     logger.info(f"Using device: {device}")
     model.to(device)
     
+    # Pass tokenizer to environment wrapper for chat template formatting
+    # env is RecordVideo(BreakoutTextWrapper), so we need to access the inner wrapper
+    # RecordVideo -> BreakoutTextWrapper
+    try:
+        env.set_tokenizer(model.tokenizer)
+    except AttributeError:
+        current_env = env
+        while hasattr(current_env, 'env'):
+            if isinstance(current_env, BreakoutTextWrapper):
+                current_env.set_tokenizer(model.tokenizer)
+                break
+            current_env = current_env.env
+    
     agent = PPOAgent(model, model.tokenizer, lr=LR, gamma=GAMMA)
     
     # Training Loop

@@ -20,6 +20,7 @@ class BreakoutTextWrapper(gym.Wrapper):
         
         self.reward_shaper = BreakoutRewardShaper() if use_reward_shaping else None
         self.observation_space = gym.spaces.Text(max_length=512)
+        self.tokenizer = None
         
         # Action mapping
         self.action_map = {
@@ -31,7 +32,7 @@ class BreakoutTextWrapper(gym.Wrapper):
         
         # Track history for velocity
         self.ball_history = deque(maxlen=2)
-        
+
     def _get_info_from_ram(self, ram):
         # Breakout RAM map
         # 72: Paddle X
@@ -51,50 +52,82 @@ class BreakoutTextWrapper(gym.Wrapper):
             "lives": lives
         }
 
-    def _get_text_obs(self, info):
-        # Check if ball is in play.
-        if info['ball_y'] == 0:
-            obs_text = (
-                f"Paddle X: {info['paddle_x']}. "
-                "Ball is not in play. "
-                f"Lives: {info['lives']}. "
-                "Goal: Keep the ball alive and break bricks. "
-                "Available actions: LEFT, RIGHT, FIRE, NOOP. "
-                "You must FIRE to start the game. "
-                "Output only one word.\n"
-                "Action:"
-            )
-            return obs_text
+    def set_tokenizer(self, tokenizer):
+        self.tokenizer = tokenizer
 
-        # Calculate approximate velocity if possible
-        ball_vel_desc = "stationary"
+    def _get_text_obs(self, info):
+        # Dynamic observation
+        obs_content = (
+            f"Paddle X: {info['paddle_x']}.\n"
+            f"Ball X: {info['ball_x']}, Ball Y: {info['ball_y']}.\n"
+            f"Lives: {info['lives']}."
+        )
+        
+        # Add velocity info
         if len(self.ball_history) == 2:
             prev_x, prev_y = int(self.ball_history[0][0]), int(self.ball_history[0][1])
             curr_x, curr_y = int(self.ball_history[1][0]), int(self.ball_history[1][1])
             dx = curr_x - prev_x
             dy = curr_y - prev_y
             
-            if dy > 0: v_y = "down"
-            elif dy < 0: v_y = "up"
-            else: v_y = "flat"
+            if dy > 0: v_y = "DOWN"
+            elif dy < 0: v_y = "UP"
+            else: v_y = "FLAT"
             
-            if dx > 0: v_x = "right"
-            elif dx < 0: v_x = "left"
-            else: v_x = "straight"
+            if dx > 0: v_x = "RIGHT"
+            elif dx < 0: v_x = "LEFT"
+            else: v_x = "STRAIGHT"
             
-            ball_vel_desc = f"moving {v_y} and {v_x}"
+            obs_content += f"\nBall is moving {v_y} and {v_x}."
+        else:
+            obs_content += "\nBall is stationary."
+
+        # Add Relative Position (Semantic Perception)
+        # Paddle width is approx 16 pixels in Breakout (standard)
+        # Center alignment check
+        paddle_center = info['paddle_x'] + 8 # Approx center
+        ball_center = info['ball_x']
+        
+        if ball_center < paddle_center - 4:
+            rel_pos = "to your LEFT"
+        elif ball_center > paddle_center + 4:
+            rel_pos = "to your RIGHT"
+        else:
+            rel_pos = "ALIGNED with you"
             
-        obs_text = (
-            f"Paddle X: {info['paddle_x']}. "
-            f"Ball X: {info['ball_x']}, Ball Y: {info['ball_y']}. "
-            f"Ball is {ball_vel_desc}. "
-            f"Lives: {info['lives']}. "
-            "Goal: Keep the ball alive and break bricks. "
-            "Available actions: LEFT, RIGHT, FIRE, NOOP. "
-            "Output only one word.\n"
-            "Action:"
+        obs_content += f"\nThe Ball is {rel_pos}."
+
+        if info['ball_y'] == 0:
+            obs_content += "\nBall is not in play. You must FIRE to start."
+
+        # System Prompt
+        system_prompt = (
+            "You are an expert Atari Breakout player.\n"
+            "GAME RULES:\n"
+            "1. The paddle moves horizontally at a fixed Y position of 189.\n"
+            "2. The ball bounces off walls and bricks.\n"
+            "3. Your goal is to intercept the ball with the paddle to break bricks.\n"
+            "4. If the ball passes the paddle (Y > 189), you lose a life.\n"
+            "5. Output ONLY one word: LEFT, RIGHT, FIRE, or NOOP."
         )
-        return obs_text
+
+        # Apply Chat Template if tokenizer is available
+        if self.tokenizer:
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": obs_content + "\nAction:"}
+            ]
+            # apply_chat_template returns a string
+            full_prompt = self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False
+            )
+            return full_prompt
+        else:
+            # Fallback
+            return f"{system_prompt}\n\nOBSERVATION:\n{obs_content}\nAction:"
 
     def reset(self, seed=None, options=None):
         obs, info = self.env.reset(seed=seed, options=options)

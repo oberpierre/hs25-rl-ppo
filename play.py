@@ -27,6 +27,7 @@ def play(checkpoint_path=None, model_name="Qwen/Qwen3-0.6B"):
         model.to("cuda")
         
     env = BreakoutTextWrapper(render_mode="human", use_reward_shaping=False)
+    env.set_tokenizer(model.tokenizer)
     
     obs, info = env.reset()
     done = False
@@ -44,6 +45,7 @@ def play(checkpoint_path=None, model_name="Qwen/Qwen3-0.6B"):
             with torch.no_grad():
                 outputs = model.generate(
                     inputs.input_ids,
+                    attention_mask=inputs.attention_mask,
                     max_new_tokens=10,
                     do_sample=True,
                     temperature=0.7,
@@ -56,7 +58,7 @@ def play(checkpoint_path=None, model_name="Qwen/Qwen3-0.6B"):
             # Clean up action text for logging/env
             action_text = action_text.strip().split('\n')[0]
             
-            logger.info(f"Observation: {obs}")
+            logger.debug(f"Observation: {obs}")
             logger.info(f"Action: {action_text}")
             
             obs, reward, terminated, truncated, info = env.step(action_text)
