@@ -25,11 +25,13 @@ def train():
     # Hyperparameters
     STEPS_PER_EPOCH = 128
     BATCH_SIZE = 4
-    LR = 1e-5
+    LR = 1e-4 # 1e-4, 1e-4
     GAMMA = 0.99
-    KL_COEF = 0.05
+    GAMMA = 0.99
+    TARGET_KL = 0.1 # 1, 0.1
+    INIT_KL_COEF = 0.05
     SAVE_INTERVAL = STEPS_PER_EPOCH * 4
-    MAX_STEPS = STEPS_PER_EPOCH * 100
+    MAX_STEPS = STEPS_PER_EPOCH * 20
     
     # Setup paths
     now = time.time()
@@ -77,6 +79,9 @@ def train():
     
     agent = PPOAgent(model, model.tokenizer, lr=LR, gamma=GAMMA)
     
+    # Initialize Adaptive KL Coefficient
+    kl_coef = INIT_KL_COEF
+    
     # Training Loop
     obs, info = env.reset()
     total_steps = 0
@@ -104,7 +109,7 @@ def train():
             
             # KL Penalty
             kl = log_prob - ref_log_prob
-            reward_penalized = reward - KL_COEF * kl
+            reward_penalized = reward - kl_coef * kl
             
             rollouts.append({
                 "state": obs,
@@ -168,13 +173,27 @@ def train():
         avg_raw_reward = np.mean(rewards)
         avg_kl = np.mean([r['kl'] for r in rollouts])
         
+        # Adaptive KL Logic
+        if avg_kl > TARGET_KL * 1.5:
+            kl_coef *= 2.0
+        elif avg_kl < TARGET_KL / 1.5:
+            kl_coef /= 2.0
+            
+        # Linear Learning Rate Decay
+        # Standard PPO schedule: Linear decay from LR to 0
+        frac = 1.0 - (total_steps - 1.0) / MAX_STEPS
+        new_lr = frac * LR
+        agent.update_lr(new_lr)
+        
         writer.add_scalar("Loss/policy_value", last_loss, total_steps)
         writer.add_scalar("Reward/average_step_reward", avg_step_reward, total_steps)
         writer.add_scalar("Reward/average_raw_reward", avg_raw_reward, total_steps)
         writer.add_scalar("KL/mean_divergence", avg_kl, total_steps)
+        writer.add_scalar("KL/coefficient", kl_coef, total_steps)
+        writer.add_scalar("Training/learning_rate", new_lr, total_steps)
         writer.flush()
         
-        logger.info(f"Step {total_steps}: Loss {last_loss:.4f}, Avg Reward {avg_step_reward:.4f}, KL {avg_kl:.4f}")
+        logger.info(f"Step {total_steps}: Loss {last_loss:.4f}, Avg Reward {avg_step_reward:.4f}, KL {avg_kl:.4f}, KL Coef {kl_coef:.4f}, LR {new_lr:.2e}")
         
         # Save Checkpoint
         # Check if we crossed a save interval or finished

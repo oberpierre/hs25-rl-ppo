@@ -14,6 +14,10 @@ class PPOAgent:
 
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr)
 
+    def update_lr(self, new_lr):
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = new_lr
+
     def get_action_and_value(self, state_text, max_new_tokens=10):
         # Tokenize state
         inputs = self.tokenizer(state_text, return_tensors="pt").to(self.model.base_model.device)
