@@ -4,17 +4,16 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 
 class PPOAgent:
-    def __init__(self, model, tokenizer, lr=1e-5, gamma=0.99, gae_lambda=0.95, clip_eps=0.2, value_coef=0.5, entropy_coef=0.01):
+    def __init__(self, model, tokenizer, lr=1e-5, gamma=0.99, gae_lambda=0.95, clip_eps=0.2, value_coef=0.5):
         self.model = model
         self.tokenizer = tokenizer
         self.gamma = gamma
         self.gae_lambda = gae_lambda
         self.clip_eps = clip_eps
         self.value_coef = value_coef
-        self.entropy_coef = entropy_coef
-        
+
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr)
-        
+
     def get_action_and_value(self, state_text, max_new_tokens=10):
         # Tokenize state
         inputs = self.tokenizer(state_text, return_tensors="pt").to(self.model.base_model.device)
@@ -63,8 +62,18 @@ class PPOAgent:
             
             # Sum log probs for the whole action
             action_log_prob = selected_log_probs.sum(dim=-1)
+
+            # Compute Reference Log Prob (for KL)
+            with self.model.base_model.disable_adapter():
+                ref_logits, _ = self.model(outputs)
+                ref_logits = ref_logits[:, :-1, :]
+                ref_gen_logits = ref_logits[:, gen_start_idx:, :]
+                
+                ref_log_probs = F.log_softmax(ref_gen_logits, dim=-1)
+                ref_selected_log_probs = torch.gather(ref_log_probs, -1, gen_targets.unsqueeze(-1)).squeeze(-1)
+                ref_action_log_prob = ref_selected_log_probs.sum(dim=-1)
             
-        return action_text, action_log_prob.item(), value.item()
+        return action_text, action_log_prob.item(), value.item(), ref_action_log_prob.item()
 
     def compute_advantages(self, rewards, values, next_value, dones):
         # rewards: list of floats
@@ -182,7 +191,7 @@ class PPOAgent:
                     
                     item_log_prob = selected_log_probs[i, s_len-1:].sum()
                     action_log_probs.append(item_log_prob)
-                    
+
                     # Value: at s_len-1 (last token of state)
                     # values[i] has shape (seq_len, 1)
                     # We want value predicted at s_len-1
@@ -190,7 +199,7 @@ class PPOAgent:
                     
                 action_log_probs = torch.stack(action_log_probs)
                 new_values = torch.stack(new_values)
-                
+
                 # PPO Loss
                 ratio = torch.exp(action_log_probs - batch_old_log_probs)
                 surr1 = ratio * batch_advantages

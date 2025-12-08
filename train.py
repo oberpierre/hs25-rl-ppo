@@ -27,6 +27,7 @@ def train():
     BATCH_SIZE = 4
     LR = 1e-5
     GAMMA = 0.99
+    KL_COEF = 0.05
     SAVE_INTERVAL = STEPS_PER_EPOCH * 4
     MAX_STEPS = STEPS_PER_EPOCH * 100
     
@@ -97,17 +98,22 @@ def train():
         
         # Rollout Phase
         for _ in range(STEPS_PER_EPOCH):
-            action_text, log_prob, value = agent.get_action_and_value(obs)
+            action_text, log_prob, value, ref_log_prob = agent.get_action_and_value(obs)
             
             next_obs, reward, terminated, truncated, info = env.step(action_text)
+            
+            # KL Penalty
+            kl = log_prob - ref_log_prob
+            reward_penalized = reward - KL_COEF * kl
             
             rollouts.append({
                 "state": obs,
                 "action_text": action_text,
                 "log_prob": log_prob,
-                "reward": reward,
+                "reward": reward_penalized, # PPO optimizes this
                 "value": value,
-                "done": terminated or truncated
+                "done": terminated or truncated,
+                "kl": kl
             })
             
             current_episode_reward += reward
@@ -127,6 +133,9 @@ def train():
                 recent_scores.append(last_score)
                 avg_score = sum(recent_scores) / len(recent_scores)
                 
+                writer.add_scalar("Reward/avg_score", avg_score, total_steps)
+                writer.flush()
+                
                 logger.info(f"Episode finished at step {total_steps}. Reward: {current_episode_reward:.2f}")
                 
                 current_episode_reward = 0
@@ -134,7 +143,7 @@ def train():
                 
         # Compute Advantages and Returns
         # We need next value for the last step
-        _, _, next_value = agent.get_action_and_value(obs) # Just to get value
+        _, _, next_value, _ = agent.get_action_and_value(obs) # Just to get value
         # Actually get_action_and_value returns (action, log_prob, value)
         # We discard action/log_prob
         next_value = next_value
@@ -155,12 +164,17 @@ def train():
         last_loss = loss.item() if isinstance(loss, torch.Tensor) else loss
         
         # Logging
-        avg_step_reward = np.mean(rewards)
+        avg_step_reward = np.mean([r['reward'] for r in rollouts]) # This is penalized reward
+        avg_raw_reward = np.mean(rewards)
+        avg_kl = np.mean([r['kl'] for r in rollouts])
+        
         writer.add_scalar("Loss/policy_value", last_loss, total_steps)
         writer.add_scalar("Reward/average_step_reward", avg_step_reward, total_steps)
+        writer.add_scalar("Reward/average_raw_reward", avg_raw_reward, total_steps)
+        writer.add_scalar("KL/mean_divergence", avg_kl, total_steps)
         writer.flush()
         
-        logger.info(f"Step {total_steps}: Loss {last_loss:.4f}, Avg Step Reward {avg_step_reward:.4f}")
+        logger.info(f"Step {total_steps}: Loss {last_loss:.4f}, Avg Reward {avg_step_reward:.4f}, KL {avg_kl:.4f}")
         
         # Save Checkpoint
         # Check if we crossed a save interval or finished
