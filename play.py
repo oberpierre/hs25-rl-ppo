@@ -40,6 +40,8 @@ def play(checkpoint_path=None, model_name="Qwen/Qwen3-0.6B"):
     logger.info("Starting game...")
     
     try:
+        start_time = time.time()
+        step_count = 0
         while not done:
             # Render is handled by gym environment in "human" mode
             
@@ -63,7 +65,7 @@ def play(checkpoint_path=None, model_name="Qwen/Qwen3-0.6B"):
             action_text = action_text.strip().split('\n')[0]
             
             logger.debug(f"Observation: {obs}")
-            logger.info(f"Action: {action_text}")
+            logger.debug(f"Action: {action_text}")
             
             obs, reward, terminated, truncated, info = env.step(action_text)
             total_reward += reward
@@ -72,7 +74,10 @@ def play(checkpoint_path=None, model_name="Qwen/Qwen3-0.6B"):
             # Slow down for visibility
             # time.sleep(0.1) 
             
-        logger.info(f"Game Over. Total Reward: {total_reward}")
+            step_count += 1
+
+        elapsed_time = time.time() - start_time
+        logger.info(f"Game Over. Total Reward: {total_reward} ({step_count} steps, {elapsed_time:.2f}s)")
         
     except KeyboardInterrupt:
         logger.info("Game stopped by user.")
