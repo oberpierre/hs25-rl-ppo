@@ -2,14 +2,14 @@
 
 A Reinforcement Learning framework tailored for training Large Language Models (specifically **Qwen**) to play **Atari Breakout** using purely text-based observations. This project leverages **Proximal Policy Optimization (PPO)** with Low-Rank Adaptation (LoRA) to fine-tune the model efficiently.
 
-## 🚀 Key Features
+## Key Features
 * **Text-Based Wrapper**: Converts visual Atari frames into structured text descriptions (e.g., "Ball X: 99, Paddle X: 72, Moving DOWN").
 * **PPO Implementation**: Custom PPO agent designed for Causal LM value heads.
 * **Efficient Training**: Uses **LoRA** to train only a small subset of parameters.
 * **Reward Shaping**: Custom reward mechanisms to guide the LLM towards gameplay fundamentals.
 * **Video Recording**: Automatically records gameplay videos during training.
 
-## 🛠️ Installation
+## Installation
 1. **Clone the repository**:
     ```bash
     git clone https://github.com/oberpierre/hs25-rl-ppo.git
@@ -23,7 +23,7 @@ A Reinforcement Learning framework tailored for training Large Language Models (
     pip install -r requirements.txt
     ```
 
-## 🏃 Usage
+## Usage
 ### Training
 Start a new training session with default hyperparameters (Qwen/Qwen3-0.6B):
 ```bash
@@ -53,7 +53,7 @@ Run a quick environment check to ensure text observations and actions are workin
 python verify_env.py
 ```
 
-## 📂 Project Structure
+## Project Structure
 - `train.py`: Entry point for training.
 - `play.py`: Inference script for playing/evaluating checkpoints.
 - `src/`
